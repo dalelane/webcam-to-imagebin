@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>Upload webcam photos to imagebin</title>
+        <meta name="description" content="Frictionless one-click upload from your webcam to imagebin" />
+
+        <link rel="stylesheet"
+              href="//maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css"
+              integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u"
+              crossorigin="anonymous">
+        <script src="//code.jquery.com/jquery-3.2.1.min.js"></script>
+
+        <style>
+            .upload { float : left; margin-right: 3em; }
+            .uploadthumbnail { float: left; }
+            .deletebtn { margin-left: 3px; }
+            .notes { font-size: 0.85em; }
+        </style>
+
+        <script>
+            var width = 320;
+            var height = 0;
+
+            var streaming = false;
+
+            var video = null;
+            var canvas = null;
+            var uploadingDiv = null;
+
+            function startup() {
+                video = document.getElementById('video');
+                canvas = document.getElementById('canvas');
+                uploadingDiv = document.getElementById('uploading');
+
+                navigator.getMedia = ( navigator.getUserMedia ||
+                                        navigator.webkitGetUserMedia ||
+                                        navigator.mozGetUserMedia ||
+                                        navigator.msGetUserMedia);
+
+                navigator.getMedia({ video : true, audio : false },
+                    function(stream) {
+                        if (navigator.mozGetUserMedia) {
+                            video.mozSrcObject = stream;
+                        }
+                        else {
+                            var vendorURL = window.URL || window.webkitURL;
+                            video.src = vendorURL.createObjectURL(stream);
+                        }
+                        video.play();
+                    },
+                    function(err) {
+                        console.log("An error occured! " + err);
+                    });
+
+                video.addEventListener('canplay', function(ev) {
+                    if (!streaming) {
+                        height = video.videoHeight / (video.videoWidth/width);
+                        if (isNaN(height)) {
+                            height = width / (4/3);
+                        }
+
+                        video.setAttribute('width', width);
+                        video.setAttribute('height', height);
+                        canvas.setAttribute('width', width);
+                        canvas.setAttribute('height', height);
+
+                        streaming = true;
+
+                        uploadingDiv.style.display = 'none';
+                    }
+                }, false);
+
+                document.getElementById('takepicture').onclick = takePhoto;
+            }
+
+
+            function displayUploadedPhoto (imagebinConfirmationString) {
+                var newImgurUrl = imagebinConfirmationString.substr(imagebinConfirmationString.indexOf('url:') + 4);
+
+                var confirmElem = document.createElement('div');
+                confirmElem.innerHTML = "<div class='upload'>" +
+                                            "<div class='uploadthumbnail'>" +
+                                                "<img src='" + newImgurUrl + "' width=160><br/>" +
+                                                "<small><a target=_blank href='" + newImgurUrl + "'>" + newImgurUrl + "</a></small>" +
+                                            "</div>" +
+                                        "</div>";
+
+                uploadingDiv.style.display = 'none';
+
+                document.getElementById('uploads').append(confirmElem);
+            }
+
+
+            function uploadPhoto (imagedata) {
+                var formData = new FormData();
+                formData.append('file', imagedata);
+
+                $.ajax({
+                    url: 'https://dalelane-image-cors-proxy.mybluemix.net',
+                    type: 'POST',
+                    processData: false,
+                    contentType: false,
+                    headers: {
+                        Accept: 'application/json'
+                    },
+                    data: formData,
+                    success: displayUploadedPhoto,
+                    error: function(err) {
+                        console.log(err);
+                        uploadingDiv.style.display = 'none';
+                        alert('Upload failed : ' + err);
+                    }
+                });
+            }
+
+
+            function takePhoto () {
+                uploadingDiv.style.display = 'block';
+
+                var context = canvas.getContext('2d');
+                if (width && height) {
+                    context.drawImage(video, 0, 0, width, height);
+                    var blobby = canvas.toBlob(uploadPhoto, 'image/jpeg');
+                }
+            }
+
+            window.addEventListener('load', startup, false);
+        </script>
+
+    </head>
+    <body>
+        <div class="container">
+            <h1>Upload webcam photos to imagebin</h1>
+        </div>
+
+        <div class="container"  style="margin-top: 2em; margin-bottom: 2em;">
+            <div class="panel panel-danger">
+                <div class="panel-heading">
+                    <h3 class="panel-title">Warning</h3>
+                </div>
+                <div class="panel-body">
+                    This tool uploads photos to the website <a href="http://imagebin.ca/" target="_blank">imagebin</a> where they will be publicly accessible.
+                    <br/><br/>
+                    <strong>Do not use this tool if you are not happy to post photos to the Internet where anyone can see them.</strong>
+                    <br/><br/>
+                    You will not be able to delete the photos.
+                </div>
+            </div>
+        </div>
+
+        <div class="container" style="margin-top: 2em; margin-bottom: 2em;">
+            <div class="alert alert-success" role="alert"><strong>Preview</strong></div>
+            <div class="row">
+                <div class="col-lg-6">
+                    <div class="camera">
+                        <video id="video">Video stream not available.</video>
+                    </div>
+                </div>
+                <div class="col-lg-2">
+                    <button type="button" class="btn btn-primary" id="takepicture">Take photo and upload to imagebin</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="uploading container" id="uploading" style="margin-top: 2em; margin-bottom: 2em;">
+            <div class="alert alert-info" role="alert"><strong>Uploading...</strong></div>
+            <canvas id="canvas"></canvas>
+        </div>
+
+        <div class="container" style="margin-top: 2em;">
+            <div class="alert alert-info" role="alert"><strong>Uploads</strong></div>
+        </div>
+        <div class="container"  id="uploads" style="margin-bottom: 2em; min-height: 140px;">
+
+        </div>
+
+        <div class="container" style="clear: both; margin-top: 2em; margin-bottom: 2em;">
+            <div class="alert alert-warning" role="alert"><strong>Notes</strong></div>
+            <div class="notes">This tool uses the <a href="https://imagebin.ca/tools.php">imagebin API</a> but is not provided, supported or endorsed by them.</div>
+            <div class="notes">Source code : <a href="https://github.com/dalelane/webcam-to-imagebin">github.com</a></div>
+            <div class="notes">Created by <a href="https://twitter.com/dalelane">@dalelane</a></div>
+        </div>
+    </body>
+</html>
