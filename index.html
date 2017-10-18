@@ -26,6 +26,8 @@
 
             var streaming = false;
 
+            var uploadedSomething = false;
+
             var video = null;
             var canvas = null;
             var uploadingDiv = null;
@@ -74,6 +76,12 @@
                 }, false);
 
                 document.getElementById('takepicture').onclick = takePhoto;
+
+                window.onbeforeunload = function () {
+                    if (uploadedSomething) {
+                        return "You will lose everything on this page if you leave or reload the page. Are you sure?";
+                    }
+                };
             }
 
 
@@ -91,6 +99,8 @@
                 uploadingDiv.style.display = 'none';
 
                 document.getElementById('uploads').append(confirmElem);
+
+                uploadedSomething = true;
             }
 
 
